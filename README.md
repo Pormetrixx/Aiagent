@@ -14,6 +14,7 @@ Entwicklung eines fortschrittlichen KI-Agenten für Kaltakquise-Telefonate, der:
 
 - **Speech-to-Text**: Lokale Spracherkennung mit Whisper
 - **Text-to-Speech**: Lokale Sprachsynthese mit Coqui TTS oder Mimic3
+- **Telefonintegration**: Asterisk PBX Integration für professionelle Anrufverwaltung
 - **Dialogsteuerung**: State-Machine + optionales lokales LLM (z.B. Ollama mit LLaMA-3, Mixtral)
 - **Emotionserkennung**: Analyse und Anpassung des Gesprächsstils
 - **Datenbank**: SQL-basierte Speicherung von:
@@ -27,6 +28,7 @@ Entwicklung eines fortschrittlichen KI-Agenten für Kaltakquise-Telefonate, der:
 - Ubuntu Server 22.04 LTS
 - Python 3.8+
 - PostgreSQL/MySQL für Datenspeicherung
+- Asterisk PBX für Telefonintegration (optional)
 - Ausreichend Speicherplatz für Modelle und Trainingsdaten
 
 ## 📂 Projektstruktur

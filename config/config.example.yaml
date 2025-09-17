@@ -1,0 +1,98 @@
+# AI Cold Calling Agent Configuration
+
+# Database Configuration
+database:
+  type: "postgresql"  # postgresql or mysql
+  host: "localhost"
+  port: 5432
+  username: "aiagent"
+  password: "your_password_here"
+  database: "cold_calling_agent"
+  pool_size: 5
+  echo: false
+
+# Speech Recognition Configuration
+speech_recognition:
+  engine: "whisper"
+  model_size: "base"  # tiny, base, small, medium, large
+  language: "de"  # German for cold calling
+  device: "cpu"  # cpu or cuda
+  
+# Text-to-Speech Configuration
+text_to_speech:
+  engine: "coqui"  # coqui or mimic3
+  model_name: "tts_models/de/thorsten/tacotron2-DDC"
+  vocoder: "vocoder_models/de/thorsten/hifigan"
+  speed: 1.0
+  voice_settings:
+    pitch: 0.0
+    energy: 1.0
+
+# Conversation Configuration
+conversation:
+  max_turns: 50
+  timeout_seconds: 30
+  default_language: "de"
+  emotional_adaptation: true
+  response_delay_ms: 500
+
+# Emotion Recognition
+emotion_recognition:
+  enabled: true
+  model_path: "models/emotion_recognition"
+  confidence_threshold: 0.7
+  adaptation_strength: 0.3
+
+# Training Configuration
+training:
+  enabled: true
+  auto_train_after_calls: 5
+  learning_rate: 0.001
+  batch_size: 32
+  max_epochs: 100
+  validation_split: 0.2
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file_path: "logs/aiagent.log"
+  max_file_size_mb: 100
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Application Configuration
+application:
+  host: "0.0.0.0"
+  port: 8080
+  debug: false
+  secret_key: "your-secret-key-change-this"
+  
+# Model Paths
+models:
+  whisper_model_path: "models/whisper"
+  tts_model_path: "models/tts"
+  emotion_model_path: "models/emotion"
+  conversation_model_path: "models/conversation"
+
+# Call Settings
+call_settings:
+  max_call_duration_minutes: 15
+  retry_attempts: 3
+  call_volume: 0.8
+  recording_enabled: true
+  recording_path: "recordings/"
+
+# Asterisk Configuration
+asterisk:
+  enabled: true
+  host: "localhost"
+  port: 5038
+  username: "admin"
+  password: "secret"
+  channel_technology: "SIP"  # SIP, PJSIP, IAX2, etc.
+  context: "outbound"
+  extension: "s"
+  priority: 1
+  caller_id: "AI Agent <1000>"
+  trunk_pattern: "SIP/trunk"  # Pattern for outbound trunk
+  local_extension_range: "1000-1999"  # Range for local extensions
