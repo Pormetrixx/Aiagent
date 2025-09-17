@@ -81,3 +81,18 @@ call_settings:
   call_volume: 0.8
   recording_enabled: true
   recording_path: "recordings/"
+
+# Asterisk Configuration
+asterisk:
+  enabled: true
+  host: "localhost"
+  port: 5038
+  username: "admin"
+  password: "secret"
+  channel_technology: "SIP"  # SIP, PJSIP, IAX2, etc.
+  context: "outbound"
+  extension: "s"
+  priority: 1
+  caller_id: "AI Agent <1000>"
+  trunk_pattern: "SIP/trunk"  # Pattern for outbound trunk
+  local_extension_range: "1000-1999"  # Range for local extensions

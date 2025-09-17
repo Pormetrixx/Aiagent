@@ -14,6 +14,7 @@ from .database import DatabaseManager, ConversationRepository, FAQRepository, Sc
 from .speech import create_stt_engine, create_tts_engine
 from .conversation import create_conversation_manager, create_emotion_recognition_system
 from .training import create_continuous_trainer
+from .telephony import create_asterisk_provider
 
 # Configure logging
 logging.basicConfig(
@@ -48,6 +49,7 @@ class AICallingAgent:
         self.emotion_system = None
         self.conversation_manager = None
         self.trainer = None
+        self.telephony_provider = None
         
         # Component repositories
         self.conversation_repo = None
@@ -98,6 +100,9 @@ class AICallingAgent:
             
             # Initialize speech components
             await self._initialize_speech_components()
+            
+            # Initialize telephony system
+            await self._initialize_telephony_system()
             
             # Initialize conversation system
             await self._initialize_conversation_system()
@@ -157,6 +162,51 @@ class AICallingAgent:
             logger.warning("TTS engine not available")
         
         logger.info("Speech components initialized")
+    
+    async def _initialize_telephony_system(self):
+        """Initialize telephony system with Asterisk"""
+        logger.info("Initializing telephony system...")
+        
+        # Get Asterisk configuration
+        asterisk_config = self.config_manager.get_section("asterisk")
+        
+        if asterisk_config.get("enabled", True):
+            try:
+                self.telephony_provider = create_asterisk_provider(asterisk_config)
+                
+                # Initialize the provider
+                if await self.telephony_provider.initialize():
+                    logger.info("Asterisk telephony provider initialized successfully")
+                    
+                    # Register call event callbacks
+                    self.telephony_provider.register_call_callback("call_answered", self._on_call_answered)
+                    self.telephony_provider.register_call_callback("call_ended", self._on_call_ended)
+                    self.telephony_provider.register_call_callback("call_connected", self._on_call_connected)
+                else:
+                    logger.error("Failed to initialize Asterisk telephony provider")
+                    self.telephony_provider = None
+                    
+            except Exception as e:
+                logger.error(f"Error initializing Asterisk provider: {e}")
+                self.telephony_provider = None
+        else:
+            logger.info("Asterisk telephony disabled in configuration")
+            self.telephony_provider = None
+    
+    def _on_call_answered(self, event_data: Dict[str, str]):
+        """Handle call answered events from Asterisk"""
+        logger.info(f"Call answered: {event_data}")
+        # This can be used to trigger conversation start
+    
+    def _on_call_ended(self, event_data: Dict[str, str]):
+        """Handle call ended events from Asterisk"""
+        logger.info(f"Call ended: {event_data}")
+        # This can be used to clean up active calls
+    
+    def _on_call_connected(self, event_data: Dict[str, str]):
+        """Handle call connected events from Asterisk"""
+        logger.info(f"Call connected: {event_data}")
+        # This can be used to start the conversation flow
     
     async def _initialize_conversation_system(self):
         """Initialize conversation management system"""
@@ -389,14 +439,7 @@ class AICallingAgent:
     
     async def _initiate_phone_call(self, phone_number: str) -> bool:
         """
-        Initiate an actual phone call
-        
-        This is a placeholder for real telephony integration.
-        In production, this would integrate with:
-        - Twilio API for cloud-based calling
-        - Asterisk/FreePBX for on-premise PBX
-        - SIP providers for VoIP calling
-        - Hardware telephony cards for PSTN
+        Initiate an actual phone call using Asterisk
         
         Args:
             phone_number: Target phone number
@@ -412,43 +455,26 @@ class AICallingAgent:
                 logger.error(f"Invalid phone number format: {phone_number}")
                 return False
             
-            # Placeholder for actual telephony integration
-            # Example integrations:
-            
-            # 1. Twilio integration:
-            # from twilio.rest import Client
-            # client = Client(account_sid, auth_token)
-            # call = client.calls.create(
-            #     to=phone_number,
-            #     from_=twilio_phone_number,
-            #     url=webhook_url_for_twiml
-            # )
-            
-            # 2. Asterisk AMI integration:
-            # import asterisk.manager
-            # manager = asterisk.manager.Manager()
-            # manager.connect(host, port, username, password)
-            # manager.originate(
-            #     channel=f"SIP/{phone_number}",
-            #     context="default",
-            #     exten="s",
-            #     priority=1
-            # )
-            
-            # 3. SIP integration with pjsua:
-            # import pjsua as pj
-            # lib = pj.Lib()
-            # lib.init()
-            # transport = lib.create_transport(pj.TransportType.UDP)
-            # acc = lib.create_account_for_transport(transport)
-            # call = acc.make_call(f"sip:{phone_number}@provider.com")
-            
-            # For development/testing, simulate successful call initiation
-            logger.info(f"Simulating phone call to {phone_number}")
-            await asyncio.sleep(0.1)  # Simulate connection delay
-            
-            # In a real implementation, this would return the actual success status
-            return True
+            # Use Asterisk telephony provider if available
+            if self.telephony_provider and self.telephony_provider.is_available():
+                logger.info(f"Initiating call to {phone_number} via Asterisk")
+                
+                result = await self.telephony_provider.make_call(phone_number)
+                
+                if result.get("success", False):
+                    call_id = result.get("call_id")
+                    logger.info(f"Successfully initiated Asterisk call to {phone_number}, call_id: {call_id}")
+                    return True
+                else:
+                    error = result.get("error", "Unknown error")
+                    logger.error(f"Failed to initiate Asterisk call to {phone_number}: {error}")
+                    return False
+            else:
+                logger.warning("Asterisk telephony provider not available, simulating call")
+                # Fallback simulation for development/testing
+                logger.info(f"Simulating phone call to {phone_number}")
+                await asyncio.sleep(0.1)  # Simulate connection delay
+                return True
             
         except Exception as e:
             logger.error(f"Error initiating phone call to {phone_number}: {e}")
@@ -608,12 +634,15 @@ class AICallingAgent:
                 "stt": self.stt_engine.is_available() if self.stt_engine else False,
                 "tts": self.tts_engine.is_available() if self.tts_engine else False,
                 "emotion_recognition": self.emotion_system.is_available() if self.emotion_system else {},
-                "training": self.trainer is not None
+                "training": self.trainer is not None,
+                "telephony": self.telephony_provider.is_available() if self.telephony_provider else False
             },
             "configuration": {
                 "database_type": self.config_manager.get("database", "type"),
                 "stt_engine": self.config_manager.get("speech_recognition", "engine"),
-                "tts_engine": self.config_manager.get("text_to_speech", "engine")
+                "tts_engine": self.config_manager.get("text_to_speech", "engine"),
+                "telephony_enabled": self.config_manager.get("asterisk", "enabled", False),
+                "asterisk_host": self.config_manager.get("asterisk", "host", "localhost")
             }
         }
     
@@ -643,6 +672,10 @@ class AICallingAgent:
         # End all active calls
         for call_id in list(self.active_calls.keys()):
             await self._end_call(call_id, "system_shutdown")
+        
+        # Clean up telephony resources
+        if self.telephony_provider:
+            await self.telephony_provider.cleanup()
         
         # Clean up resources
         self.is_running = False

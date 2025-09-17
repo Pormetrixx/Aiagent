@@ -63,6 +63,24 @@ text_to_speech:
   device: "cpu"
 ```
 
+### Asterisk Integration
+
+Configure Asterisk PBX for professional call management:
+
+```yaml
+asterisk:
+  enabled: true
+  host: "localhost"
+  port: 5038
+  username: "admin"
+  password: "secret"
+  channel_technology: "SIP"
+  context: "outbound"
+  caller_id: "AI Agent <1000>"
+```
+
+**Note**: See `docs/ASTERISK_SETUP.md` for detailed Asterisk configuration instructions.
+
 ## Running the System
 
 ### Command Line Interface
