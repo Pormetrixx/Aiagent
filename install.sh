@@ -4,6 +4,9 @@
 
 set -e
 
+# Store original directory
+ORIGINAL_DIR=$(pwd)
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -80,6 +83,7 @@ apt-get install -y \
     php-mysql \
     php-pgsql \
     php-json \
+    net-tools \
     php-mbstring \
     php-curl \
     php-zip \
@@ -99,23 +103,102 @@ log "✅ Python version: $(python3 --version)"
 # Install Asterisk PBX
 log "📞 Installing Asterisk PBX..."
 
-# Add Asterisk repository
-wget -O- https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-public-key.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/asterisk.gpg
-echo "deb https://downloads.asterisk.org/pub/telephony/asterisk asterisk-18" > /etc/apt/sources.list.d/asterisk.list
-apt-get update
-
-# Install Asterisk
-apt-get install -y \
-    asterisk \
-    asterisk-modules \
-    asterisk-config \
-    asterisk-doc
+# Check if Asterisk is already installed
+if command -v asterisk &> /dev/null; then
+    log "✅ Asterisk already installed, checking version..."
+    asterisk -V
+else
+    # Install Asterisk from Ubuntu repositories (more reliable)
+    # This approach uses the official Ubuntu packages which are stable and tested
+    log "📦 Installing Asterisk from Ubuntu repositories..."
+    
+    apt-get update
+    
+    # Install with error handling
+    if apt-get install -y \
+        asterisk \
+        asterisk-modules \
+        asterisk-config \
+        asterisk-doc \
+        asterisk-dev; then
+        log "✅ Asterisk packages installed successfully"
+    else
+        log "❌ Failed to install Asterisk packages from repository"
+        log "🔄 Trying alternative installation method..."
+        
+        # Install build dependencies
+        apt-get install -y \
+            build-essential \
+            libssl-dev \
+            libncurses-dev \
+            libnewt-dev \
+            libxml2-dev \
+            linux-headers-$(uname -r) \
+            libsqlite3-dev \
+            uuid-dev \
+            libjansson-dev \
+            wget \
+            tar
+        
+        # Download and install Asterisk from source
+        cd /tmp
+        ASTERISK_VERSION="18.15.0"
+        log "📥 Downloading Asterisk $ASTERISK_VERSION source..."
+        
+        if wget "http://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz"; then
+            tar -xzf "asterisk-${ASTERISK_VERSION}.tar.gz"
+            cd "asterisk-${ASTERISK_VERSION}"
+            
+            log "🔨 Compiling Asterisk (this may take several minutes)..."
+            ./configure --with-jansson-bundled
+            make menuselect.makeopts
+            make -j$(nproc)
+            make install
+            make samples
+            make config
+            
+            log "✅ Asterisk compiled and installed from source"
+        else
+            log "❌ Failed to download Asterisk source"
+            log "⚠️  You may need to install Asterisk manually"
+        fi
+        
+        cd "$ORIGINAL_DIR"
+    fi
+fi
 
 # Enable and start Asterisk
+log "🚀 Starting Asterisk service..."
 systemctl enable asterisk
-systemctl start asterisk
 
-log "✅ Asterisk PBX installed and started"
+# Start Asterisk and verify it's running
+if systemctl start asterisk; then
+    sleep 5
+    if systemctl is-active asterisk --quiet; then
+        log "✅ Asterisk service started successfully"
+        asterisk_version=$(asterisk -V 2>/dev/null || echo "Version check failed")
+        log "📋 Asterisk version: $asterisk_version"
+        
+        # Verify AMI port is listening
+        if netstat -tlnp | grep -q ":5038"; then
+            log "✅ Asterisk AMI port (5038) is listening"
+        else
+            warn "⚠️  Asterisk AMI port (5038) is not listening yet"
+        fi
+    else
+        warn "⚠️  Asterisk service started but may not be fully operational"
+    fi
+else
+    error "❌ Failed to start Asterisk service"
+    log "🔍 Checking Asterisk status..."
+    systemctl status asterisk || true
+    
+    # Try to get more information about the failure
+    if [ -f /var/log/asterisk/messages ]; then
+        log "📋 Recent Asterisk log entries:"
+        tail -n 10 /var/log/asterisk/messages || true
+    fi
+fi
 
 # Configure Asterisk for AI Agent
 log "🔧 Configuring Asterisk for AI Agent..."
@@ -264,7 +347,12 @@ su -c "source venv/bin/activate && pip install --upgrade pip" $ACTUAL_USER
 su -c "source venv/bin/activate && pip install -r requirements.txt" $ACTUAL_USER
 
 # Create necessary directories
-su -c "mkdir -p logs recordings models" $ACTUAL_USER
+su -c "mkdir -p logs recordings models backups" $ACTUAL_USER
+
+# Set up admin script
+log "🔧 Setting up admin script..."
+chown $ACTUAL_USER:$ACTUAL_USER admin.sh
+chmod +x admin.sh
 
 # Initialize configuration with Asterisk settings
 log "⚙️ Initializing configuration..."
@@ -1046,7 +1134,22 @@ echo "════════════════════════�
 log "🚀 Starting services..."
 systemctl start asterisk
 sleep 5
-su -c "cd $INSTALL_DIR && source venv/bin/activate && python3 run.py validate" $ACTUAL_USER
+
+# Final validation
+if su -c "cd $INSTALL_DIR && source venv/bin/activate && python3 run.py validate" $ACTUAL_USER; then
+    echo ""
+    log "✅ Installation completed successfully!"
+else
+    echo ""
+    warn "⚠️  Installation completed but validation failed"
+    echo ""
+    echo "🔧 Troubleshooting:"
+    echo "- Check Asterisk status: systemctl status asterisk"
+    echo "- Check AMI connection: telnet localhost 5038"
+    echo "- Check logs: tail -f /var/log/asterisk/messages"
+    echo "- Verify config: $INSTALL_DIR/config/config.yaml"
+    echo ""
+fi
 
 echo ""
 log "✅ Installation complete! Access the dashboard at http://$(hostname -I | awk '{print $1}')/aiagent"
