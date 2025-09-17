@@ -211,6 +211,11 @@ class AICallingAgent:
             if customer and customer.do_not_call:
                 raise ValueError("Customer is on do-not-call list")
             
+            # Initialize actual phone call (placeholder for real telephony integration)
+            call_success = await self._initiate_phone_call(customer_phone)
+            if not call_success:
+                raise RuntimeError(f"Failed to establish phone connection to {customer_phone}")
+            
             # Start conversation
             conversation_result = self.conversation_manager.start_conversation(
                 call_id=call_id,
@@ -308,12 +313,27 @@ class AICallingAgent:
             return {"text": "", "confidence": 0.0}
         
         try:
-            # Convert bytes to numpy array (implementation depends on audio format)
-            # For now, we'll simulate the transcription
-            return {
-                "text": "Simulated customer response",
-                "confidence": 0.9
-            }
+            import numpy as np
+            import tempfile
+            import os
+            
+            # Convert bytes to audio file for Whisper processing
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                temp_file.write(audio_data)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Use Whisper to transcribe the audio file
+                result = self.stt_engine.transcribe_file(temp_file_path)
+                return {
+                    "text": result.get("text", ""),
+                    "confidence": result.get("confidence", 0.0)
+                }
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                    
         except Exception as e:
             logger.error(f"Error transcribing audio: {e}")
             return {"text": "", "confidence": 0.0}
@@ -325,14 +345,186 @@ class AICallingAgent:
             return
         
         try:
-            # Generate speech
-            audio_output = self.tts_engine.synthesize(text)
+            import tempfile
+            import os
+            import subprocess
+            import platform
             
-            # In a real implementation, this would play the audio
-            logger.info(f"Speaking: {text}")
+            # Generate speech to temporary file
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                temp_file_path = temp_file.name
+            
+            try:
+                # Synthesize speech to file
+                self.tts_engine.synthesize(text, temp_file_path)
+                
+                # Play the audio file using system audio player
+                system = platform.system().lower()
+                if system == "linux":
+                    # Use aplay on Linux (common on Ubuntu)
+                    subprocess.run(["aplay", temp_file_path], 
+                                 capture_output=True, check=False)
+                elif system == "darwin":
+                    # Use afplay on macOS
+                    subprocess.run(["afplay", temp_file_path], 
+                                 capture_output=True, check=False)
+                elif system == "windows":
+                    # Use Windows Media Player on Windows
+                    subprocess.run(["start", "/wait", temp_file_path], 
+                                 shell=True, capture_output=True, check=False)
+                else:
+                    logger.warning(f"Audio playback not supported on {system}")
+                
+                logger.debug(f"Spoke text: {text[:50]}...")
+                
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
             
         except Exception as e:
             logger.error(f"Error in text-to-speech: {e}")
+            # Fallback: just log the text
+            logger.info(f"Would speak: {text}")
+    
+    async def _initiate_phone_call(self, phone_number: str) -> bool:
+        """
+        Initiate an actual phone call
+        
+        This is a placeholder for real telephony integration.
+        In production, this would integrate with:
+        - Twilio API for cloud-based calling
+        - Asterisk/FreePBX for on-premise PBX
+        - SIP providers for VoIP calling
+        - Hardware telephony cards for PSTN
+        
+        Args:
+            phone_number: Target phone number
+            
+        Returns:
+            True if call was successfully initiated, False otherwise
+        """
+        try:
+            # Validate phone number format
+            import re
+            phone_pattern = r'^\+?[1-9]\d{1,14}$'  # International format
+            if not re.match(phone_pattern, phone_number.replace(' ', '').replace('-', '')):
+                logger.error(f"Invalid phone number format: {phone_number}")
+                return False
+            
+            # Placeholder for actual telephony integration
+            # Example integrations:
+            
+            # 1. Twilio integration:
+            # from twilio.rest import Client
+            # client = Client(account_sid, auth_token)
+            # call = client.calls.create(
+            #     to=phone_number,
+            #     from_=twilio_phone_number,
+            #     url=webhook_url_for_twiml
+            # )
+            
+            # 2. Asterisk AMI integration:
+            # import asterisk.manager
+            # manager = asterisk.manager.Manager()
+            # manager.connect(host, port, username, password)
+            # manager.originate(
+            #     channel=f"SIP/{phone_number}",
+            #     context="default",
+            #     exten="s",
+            #     priority=1
+            # )
+            
+            # 3. SIP integration with pjsua:
+            # import pjsua as pj
+            # lib = pj.Lib()
+            # lib.init()
+            # transport = lib.create_transport(pj.TransportType.UDP)
+            # acc = lib.create_account_for_transport(transport)
+            # call = acc.make_call(f"sip:{phone_number}@provider.com")
+            
+            # For development/testing, simulate successful call initiation
+            logger.info(f"Simulating phone call to {phone_number}")
+            await asyncio.sleep(0.1)  # Simulate connection delay
+            
+            # In a real implementation, this would return the actual success status
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error initiating phone call to {phone_number}: {e}")
+            return False
+    
+    async def start_listening_for_customer_input(self, call_id: str, duration_seconds: int = 10) -> bytes:
+        """
+        Listen for customer audio input during an active call
+        
+        Args:
+            call_id: Active call identifier
+            duration_seconds: How long to listen for input
+            
+        Returns:
+            Raw audio data as bytes
+        """
+        if call_id not in self.active_calls:
+            raise ValueError(f"No active call found: {call_id}")
+        
+        try:
+            import pyaudio
+            import wave
+            import tempfile
+            
+            # Audio configuration
+            chunk = 1024
+            sample_format = pyaudio.paInt16
+            channels = 1
+            fs = 16000  # Sample rate for speech recognition
+            
+            p = pyaudio.PyAudio()
+            
+            logger.debug(f"Starting to listen for customer input on call {call_id}")
+            
+            # Start recording
+            stream = p.open(format=sample_format,
+                          channels=channels,
+                          rate=fs,
+                          frames_per_buffer=chunk,
+                          input=True)
+            
+            frames = []
+            
+            # Record for specified duration
+            for i in range(0, int(fs / chunk * duration_seconds)):
+                data = stream.read(chunk)
+                frames.append(data)
+            
+            # Stop and close the stream
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+            
+            # Convert frames to bytes
+            with tempfile.NamedTemporaryFile(suffix=".wav") as temp_file:
+                wf = wave.open(temp_file.name, 'wb')
+                wf.setnchannels(channels)
+                wf.setsampwidth(p.get_sample_size(sample_format))
+                wf.setframerate(fs)
+                wf.writeframes(b''.join(frames))
+                wf.close()
+                
+                # Read the audio file as bytes
+                with open(temp_file.name, 'rb') as f:
+                    audio_data = f.read()
+            
+            logger.debug(f"Captured {len(audio_data)} bytes of audio from call {call_id}")
+            return audio_data
+            
+        except ImportError:
+            logger.warning("PyAudio not available - cannot capture real audio input")
+            # Return empty audio data
+            return b''
+        except Exception as e:
+            logger.error(f"Error capturing audio input for call {call_id}: {e}")
+            return b''
     
     async def _end_call(self, call_id: str, outcome: str):
         """End a call and clean up"""
@@ -344,8 +536,34 @@ class AICallingAgent:
             
             # Generate training data if trainer is available
             if self.trainer:
-                # This would typically extract conversation turns and generate training data
-                pass
+                try:
+                    # Get conversation data
+                    conversation = self.conversation_repo.get_conversation(call_id)
+                    if conversation:
+                        # Get conversation turns
+                        conversation_turns = self.conversation_repo.get_conversation_turns(conversation.id)
+                        
+                        # Convert turns to format expected by trainer
+                        turn_data = []
+                        for turn in conversation_turns:
+                            turn_data.append({
+                                "speaker": turn.speaker,
+                                "text_content": turn.text_content,
+                                "emotion": turn.emotion,
+                                "confidence_score": turn.confidence_score,
+                                "timestamp": turn.timestamp,
+                                "response_time_ms": turn.response_time_ms
+                            })
+                        
+                        # Generate training data from the conversation
+                        self.trainer.data_generator.generate_training_data_from_conversation(
+                            conversation.id, turn_data, outcome
+                        )
+                        
+                        logger.debug(f"Generated training data for conversation {conversation.id}")
+                        
+                except Exception as e:
+                    logger.error(f"Error generating training data for call {call_id}: {e}")
             
             # Remove from active calls
             del self.active_calls[call_id]

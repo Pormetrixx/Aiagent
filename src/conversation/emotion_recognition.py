@@ -140,11 +140,19 @@ class AudioEmotionAnalyzer:
     def _load_model(self):
         """Load emotion recognition model if available"""
         try:
-            # Try to load a pre-trained emotion recognition model
-            # This would typically be a deep learning model trained on emotional speech
-            logger.info("Audio emotion recognition model initialized")
+            # Try to use a simple rule-based model for audio emotion recognition
+            # In a production environment, this could be replaced with a deep learning model
+            self.model_available = True
+            self.feature_weights = {
+                'energy_weight': 1.5,
+                'tempo_weight': 1.2,
+                'spectral_weight': 1.0,
+                'pitch_weight': 0.8
+            }
+            logger.info("Audio emotion recognition model initialized with rule-based approach")
         except Exception as e:
             logger.warning(f"Could not load audio emotion model: {e}")
+            self.model_available = False
     
     def analyze_audio_emotion(self, audio_path: str) -> Dict[str, Any]:
         """
