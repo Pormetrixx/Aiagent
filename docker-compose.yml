@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  aiagent:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_HOST=postgres
+      - DATABASE_USER=aiagent
+      - DATABASE_PASSWORD=aiagent_password
+      - DATABASE_NAME=cold_calling_agent
+    depends_on:
+      - postgres
+    volumes:
+      - ./logs:/app/logs
+      - ./recordings:/app/recordings
+      - ./models:/app/models
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=cold_calling_agent
+      - POSTGRES_USER=aiagent
+      - POSTGRES_PASSWORD=aiagent_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
