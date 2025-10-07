@@ -98,13 +98,65 @@ class ConfigManager:
     def _apply_env_overrides(self):
         """Apply environment variable overrides"""
         env_mappings = {
+            # Database
             "DATABASE_HOST": ("database", "host"),
             "DATABASE_PORT": ("database", "port"),
             "DATABASE_USER": ("database", "username"),
             "DATABASE_PASSWORD": ("database", "password"),
             "DATABASE_NAME": ("database", "database"),
-            "STT_MODEL_SIZE": ("speech_recognition", "model_size"),
+            
+            # STT - General
+            "STT_ENGINE": ("speech_recognition", "engine"),
+            "STT_LANGUAGE": ("speech_recognition", "language"),
+            
+            # STT - Whisper
+            "STT_WHISPER_MODEL_SIZE": ("speech_recognition", "model_size"),
+            "STT_WHISPER_DEVICE": ("speech_recognition", "device"),
+            
+            # STT - Deepgram
+            "DEEPGRAM_API_KEY": ("speech_recognition", "api_key"),
+            "STT_DEEPGRAM_MODEL": ("speech_recognition", "model"),
+            
+            # STT - Azure
+            "AZURE_SPEECH_KEY": ("speech_recognition", "api_key"),
+            "AZURE_SPEECH_REGION": ("speech_recognition", "region"),
+            
+            # STT - Google
+            "GOOGLE_APPLICATION_CREDENTIALS": ("speech_recognition", "credentials_path"),
+            "STT_GOOGLE_MODEL": ("speech_recognition", "model"),
+            
+            # TTS - General
             "TTS_ENGINE": ("text_to_speech", "engine"),
+            "TTS_LANGUAGE": ("text_to_speech", "language"),
+            
+            # TTS - Coqui
+            "TTS_COQUI_MODEL": ("text_to_speech", "model_name"),
+            "TTS_COQUI_VOCODER": ("text_to_speech", "vocoder"),
+            "TTS_COQUI_DEVICE": ("text_to_speech", "device"),
+            "TTS_COQUI_SPEAKER": ("text_to_speech", "speaker"),
+            
+            # TTS - Mimic3
+            "TTS_MIMIC3_VOICE": ("text_to_speech", "voice"),
+            "TTS_MIMIC3_URL": ("text_to_speech", "url"),
+            
+            # TTS - ElevenLabs
+            "ELEVENLABS_API_KEY": ("text_to_speech", "api_key"),
+            "TTS_ELEVENLABS_VOICE_ID": ("text_to_speech", "voice_id"),
+            "TTS_ELEVENLABS_MODEL": ("text_to_speech", "model"),
+            "TTS_ELEVENLABS_STABILITY": ("text_to_speech", "stability"),
+            "TTS_ELEVENLABS_SIMILARITY_BOOST": ("text_to_speech", "similarity_boost"),
+            
+            # TTS - Azure (shares api_key and region with STT)
+            "TTS_AZURE_VOICE": ("text_to_speech", "voice"),
+            "TTS_AZURE_RATE": ("text_to_speech", "rate"),
+            "TTS_AZURE_PITCH": ("text_to_speech", "pitch"),
+            
+            # TTS - Google (shares credentials_path with STT)
+            "TTS_GOOGLE_VOICE": ("text_to_speech", "voice"),
+            "TTS_GOOGLE_SPEAKING_RATE": ("text_to_speech", "speaking_rate"),
+            "TTS_GOOGLE_PITCH": ("text_to_speech", "pitch"),
+            
+            # Other
             "LOG_LEVEL": ("logging", "level"),
         }
         
@@ -118,6 +170,13 @@ class ConfigManager:
                 if key == "port":
                     try:
                         value = int(value)
+                    except ValueError:
+                        continue
+                
+                # Convert float values
+                if key in ["stability", "similarity_boost", "speaking_rate", "pitch"]:
+                    try:
+                        value = float(value)
                     except ValueError:
                         continue
                 

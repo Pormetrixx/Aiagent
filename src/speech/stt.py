@@ -6,27 +6,40 @@ import logging
 import numpy as np
 import torch
 import whisper
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 import soundfile as sf
 from pathlib import Path
+from .base import BaseSTTEngine
 
 logger = logging.getLogger(__name__)
 
 
-class WhisperSTT:
+class WhisperSTT(BaseSTTEngine):
     """Speech-to-Text using OpenAI Whisper"""
     
-    def __init__(self, model_size: str = "base", device: str = "auto", language: str = "de"):
+    def __init__(self, config: Dict[str, Any] = None, model_size: str = None, 
+                 device: str = None, language: str = None):
         """
         Initialize Whisper STT
         
         Args:
-            model_size: Whisper model size (tiny, base, small, medium, large)
-            device: Device to use (cpu, cuda, auto)
-            language: Language code for recognition
+            config: Configuration dictionary (new style)
+            model_size: Whisper model size (tiny, base, small, medium, large) - legacy
+            device: Device to use (cpu, cuda, auto) - legacy
+            language: Language code for recognition - legacy
         """
-        self.model_size = model_size
-        self.language = language
+        # Support both new config dict and legacy parameters
+        if config is None:
+            config = {
+                "model_size": model_size or "base",
+                "device": device or "auto",
+                "language": language or "de"
+            }
+        
+        super().__init__(config)
+        
+        self.model_size = config.get("model_size", "base")
+        device = config.get("device", "auto")
         
         # Auto-detect device if needed
         if device == "auto":
@@ -86,7 +99,8 @@ class WhisperSTT:
             logger.error(f"Error transcribing audio: {e}")
             raise
     
-    def transcribe_audio_data(self, audio_data: np.ndarray, sample_rate: int = 16000, **kwargs) -> Dict[str, Any]:
+    def transcribe_audio_data(self, audio_data: Union[np.ndarray, bytes], 
+                             sample_rate: int = 16000, **kwargs) -> Dict[str, Any]:
         """
         Transcribe audio data to text
         
@@ -238,23 +252,28 @@ class AudioProcessor:
             return audio_data
 
 
-def create_stt_engine(config: Dict[str, Any]) -> WhisperSTT:
+def create_stt_engine(config: Dict[str, Any]):
     """
     Factory function to create STT engine based on configuration
     
     Args:
-        config: STT configuration dictionary
+        config: STT configuration dictionary with 'engine' key
         
     Returns:
-        Configured STT engine
+        Configured STT engine (BaseSTTEngine subclass)
     """
     engine_type = config.get("engine", "whisper").lower()
     
     if engine_type == "whisper":
-        return WhisperSTT(
-            model_size=config.get("model_size", "base"),
-            device=config.get("device", "auto"),
-            language=config.get("language", "de")
-        )
+        return WhisperSTT(config)
+    elif engine_type == "deepgram":
+        from .stt_deepgram import DeepgramSTT
+        return DeepgramSTT(config)
+    elif engine_type == "azure":
+        from .stt_azure import AzureSTT
+        return AzureSTT(config)
+    elif engine_type == "google":
+        from .stt_google import GoogleSTT
+        return GoogleSTT(config)
     else:
         raise ValueError(f"Unsupported STT engine: {engine_type}")
