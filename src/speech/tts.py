@@ -7,26 +7,39 @@ import numpy as np
 from typing import Optional, Dict, Any, Union
 from pathlib import Path
 import soundfile as sf
+from .base import BaseTTSEngine
 
 logger = logging.getLogger(__name__)
 
 
-class CoquiTTS:
+class CoquiTTS(BaseTTSEngine):
     """Text-to-Speech using Coqui TTS"""
     
-    def __init__(self, model_name: str = "tts_models/de/thorsten/tacotron2-DDC",
-                 vocoder: Optional[str] = None, device: str = "cpu"):
+    def __init__(self, config: Dict[str, Any] = None, model_name: str = None,
+                 vocoder: Optional[str] = None, device: str = None):
         """
         Initialize Coqui TTS
         
         Args:
-            model_name: TTS model name
-            vocoder: Vocoder model name (optional)
-            device: Device to use (cpu, cuda)
+            config: Configuration dictionary (new style)
+            model_name: TTS model name - legacy
+            vocoder: Vocoder model name (optional) - legacy
+            device: Device to use (cpu, cuda) - legacy
         """
-        self.model_name = model_name
-        self.vocoder = vocoder
-        self.device = device
+        # Support both new config dict and legacy parameters
+        if config is None:
+            config = {
+                "model_name": model_name or "tts_models/de/thorsten/tacotron2-DDC",
+                "vocoder": vocoder,
+                "device": device or "cpu",
+                "language": "de"
+            }
+        
+        super().__init__(config)
+        
+        self.model_name = config.get("model_name", "tts_models/de/thorsten/tacotron2-DDC")
+        self.vocoder = config.get("vocoder")
+        self.device = config.get("device", "cpu")
         self.tts = None
         self._load_model()
     
@@ -111,19 +124,30 @@ class CoquiTTS:
         return self.tts is not None
 
 
-class Mimic3TTS:
+class Mimic3TTS(BaseTTSEngine):
     """Text-to-Speech using Mimic3"""
     
-    def __init__(self, voice: str = "de_DE/thorsten_low", url: str = "http://localhost:59125"):
+    def __init__(self, config: Dict[str, Any] = None, voice: str = None, url: str = None):
         """
         Initialize Mimic3 TTS
         
         Args:
-            voice: Voice name for synthesis
-            url: Mimic3 server URL
+            config: Configuration dictionary (new style)
+            voice: Voice name for synthesis - legacy
+            url: Mimic3 server URL - legacy
         """
-        self.voice = voice
-        self.url = url
+        # Support both new config dict and legacy parameters
+        if config is None:
+            config = {
+                "voice": voice or "de_DE/thorsten_low",
+                "url": url or "http://localhost:59125",
+                "language": "de"
+            }
+        
+        super().__init__(config)
+        
+        self.voice = config.get("voice", "de_DE/thorsten_low")
+        self.url = config.get("url", "http://localhost:59125")
         self.session = None
         self._initialize_session()
     
@@ -239,9 +263,18 @@ class TTSEngine:
         """Initialize the appropriate TTS engine"""
         try:
             if self.engine_type == "coqui":
-                self.engine = CoquiTTS(**self.config)
+                self.engine = CoquiTTS(self.config)
             elif self.engine_type == "mimic3":
-                self.engine = Mimic3TTS(**self.config)
+                self.engine = Mimic3TTS(self.config)
+            elif self.engine_type == "elevenlabs":
+                from .tts_elevenlabs import ElevenLabsTTS
+                self.engine = ElevenLabsTTS(self.config)
+            elif self.engine_type == "azure":
+                from .tts_azure import AzureTTS
+                self.engine = AzureTTS(self.config)
+            elif self.engine_type == "google":
+                from .tts_google import GoogleTTS
+                self.engine = GoogleTTS(self.config)
             else:
                 raise ValueError(f"Unsupported TTS engine: {self.engine_type}")
                 
@@ -291,7 +324,7 @@ def create_tts_engine(config: Dict[str, Any]) -> TTSEngine:
     Factory function to create TTS engine based on configuration
     
     Args:
-        config: TTS configuration dictionary
+        config: TTS configuration dictionary with 'engine' key
         
     Returns:
         Configured TTS engine
@@ -302,12 +335,34 @@ def create_tts_engine(config: Dict[str, Any]) -> TTSEngine:
         engine_config = {
             "model_name": config.get("model_name", "tts_models/de/thorsten/tacotron2-DDC"),
             "vocoder": config.get("vocoder"),
-            "device": config.get("device", "cpu")
+            "device": config.get("device", "cpu"),
+            "language": config.get("language", "de")
         }
     elif engine_type == "mimic3":
         engine_config = {
             "voice": config.get("voice", "de_DE/thorsten_low"),
-            "url": config.get("url", "http://localhost:59125")
+            "url": config.get("url", "http://localhost:59125"),
+            "language": config.get("language", "de")
+        }
+    elif engine_type == "elevenlabs":
+        engine_config = {
+            "api_key": config.get("api_key"),
+            "voice_id": config.get("voice_id"),
+            "model": config.get("model", "eleven_multilingual_v2"),
+            "language": config.get("language", "de")
+        }
+    elif engine_type == "azure":
+        engine_config = {
+            "api_key": config.get("api_key"),
+            "region": config.get("region", "westeurope"),
+            "voice": config.get("voice", "de-DE-KatjaNeural"),
+            "language": config.get("language", "de-DE")
+        }
+    elif engine_type == "google":
+        engine_config = {
+            "credentials_path": config.get("credentials_path"),
+            "voice": config.get("voice", "de-DE-Wavenet-C"),
+            "language": config.get("language", "de-DE")
         }
     else:
         raise ValueError(f"Unsupported TTS engine: {engine_type}")
