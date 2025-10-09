@@ -38,7 +38,10 @@ class ConfigManager:
         try:
             if not self.config_path.exists():
                 logger.warning(f"Config file not found: {self.config_path}")
+                logger.info("Attempting to load configuration from environment variables only")
                 self._create_default_config()
+                # Apply env overrides - if enough env vars are set, this will work fine
+                self._apply_env_overrides()
                 return
             
             with open(self.config_path, 'r', encoding='utf-8') as file:
@@ -52,6 +55,8 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Error loading configuration: {e}")
             self._create_default_config()
+            # Try to apply env overrides even after error
+            self._apply_env_overrides()
     
     def _create_default_config(self):
         """Create default configuration"""

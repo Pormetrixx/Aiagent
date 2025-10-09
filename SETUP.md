@@ -16,11 +16,13 @@
    # Edit and add your API keys
    nano .env
    ```
+   
+   **Important:** Die `.env`-Datei ist alles, was Sie brauchen! Die `config.yaml` ist optional.
 
 3. **Set up your database:**
    - Install PostgreSQL or MySQL
    - Create a database named `cold_calling_agent`
-   - Update database credentials in `.env` or `config/config.yaml`
+   - Update database credentials in `.env`
 
 4. **Test voice engines:**
    ```bash
@@ -70,6 +72,38 @@ pip install -r requirements.txt
 ```
 
 ## Configuration
+
+### Configuration Methods
+
+Das System unterstützt zwei Konfigurationsmethoden:
+
+#### Methode 1: Nur .env-Datei (Empfohlen)
+
+**Sie benötigen nur die `.env`-Datei!** Das ist der einfachste und empfohlene Weg:
+
+```bash
+# .env-Datei erstellen
+cp .env.example .env
+
+# Bearbeiten und API-Schlüssel hinzufügen
+nano .env
+```
+
+Das System verwendet Standardwerte für alle nicht gesetzten Optionen. Die `config.yaml`-Datei ist **optional** und wird nur für erweiterte Konfigurationen benötigt.
+
+#### Methode 2: .env + config.yaml (Optional, für erweiterte Setups)
+
+Wenn Sie zusätzliche Konfigurationsoptionen benötigen, die nicht über Umgebungsvariablen verfügbar sind:
+
+```bash
+# Optional: config.yaml erstellen
+cp config/config.example.yaml config/config.yaml
+
+# Erweiterte Einstellungen bearbeiten
+nano config/config.yaml
+```
+
+**Wichtig:** Umgebungsvariablen aus `.env` überschreiben immer die Werte in `config.yaml`.
 
 ### Voice Engine Configuration via .env
 

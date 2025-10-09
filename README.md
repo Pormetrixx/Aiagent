@@ -95,6 +95,38 @@ pip install -r requirements.txt
 
 ## 📝 Konfiguration
 
+### Konfigurationsmethoden
+
+Das System unterstützt **zwei Konfigurationsmethoden**:
+
+#### Option 1: Nur .env-Datei (Empfohlen für einfache Setups)
+
+Die einfachste Methode ist die Verwendung nur der `.env`-Datei:
+
+```bash
+# .env-Datei aus Vorlage erstellen
+cp .env.example .env
+
+# .env-Datei bearbeiten und API-Schlüssel eintragen
+nano .env
+```
+
+**Das System funktioniert vollständig mit nur der .env-Datei.** Die `config.yaml` ist optional!
+
+#### Option 2: .env + config.yaml (Erweiterte Konfiguration)
+
+Für komplexere Setups können Sie zusätzlich `config.yaml` verwenden:
+
+```bash
+# config.yaml aus Vorlage erstellen (optional)
+cp config/config.example.yaml config/config.yaml
+
+# Erweiterte Einstellungen bearbeiten
+nano config/config.yaml
+```
+
+Die `.env`-Werte überschreiben immer die `config.yaml`-Werte.
+
 ### 1. Umgebungsvariablen einrichten
 
 ```bash
@@ -151,6 +183,8 @@ TTS_AZURE_VOICE=de-DE-KatjaNeural
 # Für Google Cloud TTS
 TTS_GOOGLE_VOICE=de-DE-Wavenet-C
 ```
+
+**Hinweis:** Sie benötigen **keine** `config.yaml` Datei! Alle Einstellungen können über die `.env`-Datei vorgenommen werden. Das System verwendet Standardwerte für nicht gesetzte Optionen.
 
 ### 4. Empfohlene Stimmen für Investment Cold Calling (Deutsch)
 
